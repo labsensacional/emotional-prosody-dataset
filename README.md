@@ -16,14 +16,18 @@ The dataset was originally published with 2,519 clips (Cowen et al., 2019). The 
 2. **Rating:** US and Indian participants on MTurk rated each clip on 48 emotion categories and several affective scales (valence, arousal, etc.).
 3. **Analysis:** Semantic space methods (PPCA across cultures) identified 12+ preserved dimensions of emotional prosody. Results visualized as a 2D t-SNE map.
 
+## Audio files
+
+**Google Drive:** https://drive.google.com/drive/folders/1_KOPBVD6VsYa5pPDXcWIEgflg6fQAYVj
+
+7,988 MP3 clips (~142 MB total). Filenames match the `File` field in the metadata (basename only).
+
 ## Files
 
 ```
 metadata.json          — full dataset, one object per clip (7,988 entries)
 labels.csv             — same data in CSV format
-audio/                 — MP3 files, named to match the File field
-download_progress.csv  — download tracking (url, filename, status)
-scrape_and_download.py — script used to extract + download everything
+scrape_and_download.py — script used to extract + download everything from hume.ai
 ```
 
 ## Data format
