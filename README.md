@@ -20,7 +20,7 @@ The dataset was originally published with 2,519 clips (Cowen et al., 2019). The 
 
 **Google Drive:** https://drive.google.com/drive/folders/1_KOPBVD6VsYa5pPDXcWIEgflg6fQAYVj
 
-7,988 MP3 clips (~142 MB total). Filenames match the `File` field in the metadata (basename only).
+7,988 MP3 clips (~350 MB total). Filenames match the `File` field in the metadata (basename only).
 
 ## Files
 
