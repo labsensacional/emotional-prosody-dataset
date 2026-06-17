@@ -11,8 +11,8 @@ import csv
 import os
 import sys
 import time
-import random
-import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
 PAGE_URL = "https://www.hume.ai/explore/speech-prosody-model"
@@ -23,6 +23,8 @@ METADATA_PATH = os.path.join(OUT_DIR, "metadata.json")
 TRACKING_PATH = os.path.join(OUT_DIR, "download_progress.csv")
 
 MIN_FREE_GB = 5
+WORKERS = 16
+tracking_lock = threading.Lock()
 
 def check_free_space():
     st = os.statvfs(OUT_DIR)
@@ -105,12 +107,13 @@ def load_tracking():
     return done
 
 def append_tracking(url, filename, status):
-    exists = os.path.exists(TRACKING_PATH)
-    with open(TRACKING_PATH, 'a', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['url', 'filename', 'status'])
-        if not exists:
-            writer.writeheader()
-        writer.writerow({'url': url, 'filename': filename, 'status': status})
+    with tracking_lock:
+        exists = os.path.exists(TRACKING_PATH)
+        with open(TRACKING_PATH, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=['url', 'filename', 'status'])
+            if not exists:
+                writer.writeheader()
+            writer.writerow({'url': url, 'filename': filename, 'status': status})
 
 def download_audio(url, dest_path):
     headers = {
@@ -180,41 +183,49 @@ def main():
 
     success = 0
     errors = 0
+    counter_lock = threading.Lock()
+    completed = [0]
 
-    for i, entry in enumerate(todo):
+    def download_one(entry):
         url = entry.get('File', '')
         if not url:
-            continue
-
+            return
         fname = os.path.basename(url)
         dest = os.path.join(AUDIO_DIR, fname)
 
-        # Skip if already exists on disk
         if os.path.exists(dest):
             append_tracking(url, fname, 'ok')
-            done.add(url)
-            continue
+            return 'ok'
 
-        # Disk space check
         free = check_free_space()
         if free < MIN_FREE_GB:
-            print(f"LOW DISK SPACE: {free:.1f}GB free. Stopping.")
+            print(f"\nLOW DISK SPACE: {free:.1f}GB free. Stopping.")
             sys.exit(1)
 
-        print(f"[{i+1}/{len(todo)}] {fname} ... ", end='', flush=True)
         ok = download_audio(url, dest)
+        append_tracking(url, fname, 'ok' if ok else 'error')
+        return 'ok' if ok else 'error'
 
-        if ok:
-            append_tracking(url, fname, 'ok')
-            success += 1
-            print("ok")
-        else:
-            append_tracking(url, fname, 'error')
-            errors += 1
+    print(f"Downloading with {WORKERS} concurrent workers...\n")
+    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        futures = {executor.submit(download_one, e): e for e in todo}
+        for future in as_completed(futures):
+            result = future.result()
+            with counter_lock:
+                completed[0] += 1
+                if result == 'ok':
+                    success += 1
+                elif result == 'error':
+                    errors += 1
+                total_done = len(done) + completed[0]
+                pct = total_done * 100 // len(data)
+                bar = pct // 2
+                print(
+                    f"\r[{'#'*bar}{'-'*(50-bar)}] {total_done}/{len(data)} ({pct}%)  ",
+                    end='', flush=True
+                )
 
-        time.sleep(random.uniform(0.1, 0.3))
-
-    print(f"\nDone. Success: {success}, Errors: {errors}")
+    print(f"\n\nDone. Success: {success}, Errors: {errors}")
     print(f"Audio: {AUDIO_DIR}")
     print(f"Labels: {CSV_PATH}")
     print(f"Metadata: {METADATA_PATH}")
