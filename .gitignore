@@ -1,0 +1,4 @@
+audio/
+download.log
+download_progress.csv
+*.part
